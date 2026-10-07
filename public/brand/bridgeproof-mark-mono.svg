@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">BridgeProof monochrome mark</title>
+  <desc id="desc">A receipt frame interrupted by a verification slit.</desc>
+  <path d="M62 48h132v160H62z" fill="none" stroke="currentColor" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M62 116h68M127 116h67" fill="none" stroke="currentColor" stroke-width="27"/>
+  <path d="m117 101 24 15-24 15" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="square" stroke-linejoin="miter"/>
+</svg>

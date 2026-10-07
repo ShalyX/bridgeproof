@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">BridgeProof</title>
+  <desc id="desc">Verify the message before it moves.</desc>
+  <rect width="1200" height="630" fill="#101313"/>
+  <path d="M824 0h376v630H824z" fill="#171b1b"/>
+  <circle cx="1034" cy="315" r="232" fill="none" stroke="#B7E2C2" stroke-opacity=".16" stroke-width="2"/>
+  <g transform="translate(897 178) scale(.95)">
+    <rect width="256" height="256" rx="34" fill="#101313"/>
+    <path d="M62 48h132v160H62z" fill="none" stroke="#F4F0E7" stroke-width="16" stroke-linejoin="round"/>
+    <path d="M62 116h68" fill="none" stroke="#101313" stroke-width="27"/>
+    <path d="M127 116h67" fill="none" stroke="#FF6B4A" stroke-width="27"/>
+    <path d="m117 101 24 15-24 15" fill="none" stroke="#F4F0E7" stroke-width="9" stroke-linecap="square" stroke-linejoin="miter"/>
+  </g>
+  <text x="92" y="188" fill="#FF6B4A" font-family="monospace" font-size="16" letter-spacing="4">SOURCE-FIRST / FAIL-CLOSED</text>
+  <text x="92" y="294" fill="#F4F0E7" font-family="Arial, sans-serif" font-size="76" font-weight="700" letter-spacing="-4">BridgeProof</text>
+  <text x="96" y="353" fill="#A7AFAC" font-family="Arial, sans-serif" font-size="28">Verify the message before it moves.</text>
+  <path d="M96 412h444" stroke="#B7E2C2" stroke-width="2"/>
+  <text x="96" y="462" fill="#A7AFAC" font-family="monospace" font-size="14" letter-spacing="1">GENLAYER CONSENSUS · SOURCE RECEIPTS · ONE-USE PERMITS</text>
+</svg>

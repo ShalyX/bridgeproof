@@ -1,0 +1,27 @@
+{
+  "name": "bridgeproof",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Wallet-connected BridgeProof product for consensus-backed source receipt verification.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "npm run test:validation",
+    "test:validation": "tsc src/lib/validation.ts src/lib/receipt.ts src/lib/source.ts src/lib/network.ts --target ES2022 --module NodeNext --moduleResolution NodeNext --outDir .test-output && node --test tests/validation.test.mjs tests/source.test.mjs tests/network.test.mjs"
+  },
+  "dependencies": {
+    "genlayer-js": "1.1.8",
+    "lucide-react": "0.468.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.4",
+    "typescript": "5.7.2",
+    "vite": "5.4.10"
+  }
+}
