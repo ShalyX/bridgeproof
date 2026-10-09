@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isFailedReceipt } from "../.test-output/receipt.js";
+import { getReceiptFailureMessage, isFailedReceipt } from "../.test-output/receipt.js";
 import { validateProofForm } from "../.test-output/validation.js";
 
 const validForm = {
@@ -56,5 +56,48 @@ test("does not treat a successful finalized execution as a failed write", () => 
       txExecutionResultName: "FINISHED_WITH_RETURN",
     }),
     false,
+  );
+});
+
+test("detects the snake-case rollback shape returned by StudioNet", () => {
+  const receipt = {
+    status_name: "FINALIZED",
+    result_name: "MAJORITY_AGREE",
+    consensus_data: {
+      leader_receipt: [
+        {
+          execution_result: "ERROR",
+          result: { status: "rollback", payload: "[EXPECTED] Source transaction already authorized" },
+        },
+      ],
+      validators: [
+        { execution_result: "ERROR", vote: "agree" },
+        { execution_result: "ERROR", vote: "agree" },
+      ],
+    },
+  };
+
+  assert.equal(isFailedReceipt(receipt), true);
+  assert.equal(getReceiptFailureMessage(receipt), "[EXPECTED] Source transaction already authorized");
+});
+
+test("accepts the snake-case success shape returned by StudioNet", () => {
+  assert.equal(
+    isFailedReceipt({
+      status_name: "FINALIZED",
+      result_name: "MAJORITY_AGREE",
+      consensus_data: {
+        leader_receipt: [{ execution_result: "SUCCESS", result: { status: "return" } }],
+        validators: [{ execution_result: "SUCCESS", vote: "agree" }],
+      },
+    }),
+    false,
+  );
+});
+
+test("fails closed when finalization has no contract execution result", () => {
+  assert.equal(
+    isFailedReceipt({ status_name: "FINALIZED", result_name: "MAJORITY_AGREE" }),
+    true,
   );
 });

@@ -48,7 +48,7 @@ type Route =
 
 const initialForm = (): ProofForm => ({
   proofId: `proof-${Date.now().toString(36)}`,
-  targetId: "sepolia-transfer",
+  targetId: "sepolia-receipt-v2",
   sourceChainId: "11155111",
   txHash: "",
   expectedSender: "",
@@ -72,10 +72,10 @@ type OperatorForm = {
 };
 
 const initialOperatorForm = (): OperatorForm => ({
-  targetId: "sepolia-transfer",
+  targetId: "sepolia-receipt-v2",
   sourceChainId: "11155111",
-  targetName: "Sepolia transfer receipt",
-  targetDescription: "Native or contract-call receipts that a guarded execution flow may rely on.",
+  targetName: "Sepolia transaction receipt",
+  targetDescription: "Verifies authoritative Sepolia receipt fields and confirmation depth. Version 1 does not decode or assert bridge-message event semantics.",
   transactionUrlTemplate: DEFAULT_TX_TEMPLATE,
   logsUrlTemplate: DEFAULT_LOGS_TEMPLATE,
   executor: executorAddress,

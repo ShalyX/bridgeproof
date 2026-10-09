@@ -1,6 +1,6 @@
 # BridgeProof live test report
 
-Updated: 2026-10-09
+Updated: 2026-10-10
 
 ## Security correction status
 
@@ -22,10 +22,43 @@ The corrected contracts now:
 - explicitly scope v1 to transaction-receipt verification rather than
   protocol-specific bridge-event verification.
 
-The local direct-contract suite covers these adversarial cases and currently
-passes 18 tests. A fresh StudioNet deployment and live wallet-backed replay,
-deactivation, and version-mutation runs are required before this section can be
-marked live-verified.
+The direct-contract suite covers these adversarial cases and passes 18 tests.
+The corrected contracts and the source-level replay boundary are now verified
+on StudioNet. Live target deactivation and version-mutation runs remain.
+
+## Corrected StudioNet deployment
+
+- BridgeProof: `0xd44F249529105B1D623b59974B88ee5D31fFB5E5`
+- BridgeProof deployment: `0xae3082e03f4c246f30d051d8526a9bed1ac744b5a6bb6f2d8b98dc9c08800fcd`
+- GuardedExecutor: `0x2B1C0DE9Ee4DAe9C8241410CE860c0E74c52818B`
+- GuardedExecutor deployment: `0x5ce9620955aaf0e0892f86aee7a8a8b8ad8ffe0eb33f232c0032823dca330e50`
+- Registered target: `sepolia-receipt-v2`, active, version `1`
+- Target registration: `0x1a44008093ab8b9fb0fb3e417b25c12ef9d600c7f6102e17ef6fff91ddced0d9`
+- Public app: `https://bridgeproof.vercel.app`
+
+The target description explicitly limits the product to transaction receipt
+fields and finality. It does not claim protocol-specific bridge-message event
+verification.
+
+### Corrected positive and source-replay runs
+
+- Approved proof: `proof-mv1j1p98`
+- Source transaction: `0xb6685ef5d7a688c1582725145677f129452b205c27c083cff036ecb56a060ac4`
+- Readback: `approved / MATCH_CONFIRMED / high`, target version `1`, permit
+  nonce `1`, and the source authorization points to `proof-mv1j1p98`.
+- Replay proof attempted: `proof-mv1kgr1f`
+- Replay transaction: `0xf1292e168acaf980398eeaff6c5cd82d3d52f63264d4798af75079e03bd06781`
+- Consensus: `MAJORITY_AGREE`; every validator execution result was `ERROR`.
+- Contract result: rollback `[EXPECTED] Source transaction already authorized`.
+- Post-transaction readback: no second proof was stored and the source
+  authorization remained bound to `proof-mv1j1p98`.
+
+This run also exposed a client bug: the original UI interpreted validator
+agreement as write success even when all validators agreed on a rollback. The
+receipt parser now requires an explicit successful execution result, handles
+StudioNet's snake-case receipt fields, surfaces the rollback message, and fails
+closed when execution status is absent. Sixteen frontend tests cover both the
+success and rollback receipt shapes.
 
 This report records the first real StudioNet-to-Sepolia execution path. It uses the
 unlocked RepLayer account for signing and a live Blockscout Sepolia receipt as the

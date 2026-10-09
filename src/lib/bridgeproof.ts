@@ -1,4 +1,4 @@
-import { isFailedReceipt, type Receipt } from "./receipt.js";
+import { getReceiptFailureMessage, isFailedReceipt, type Receipt } from "./receipt.js";
 import { STUDIONET_CHAIN_ID_HEX } from "./network.js";
 
 const FINALITY_INTERVAL_MS = 5_000;
@@ -178,7 +178,9 @@ async function writeAndFinalize(
     retries: FINALITY_RETRIES,
   });
   if (isFailedReceipt(receipt)) {
-    const error = new Error("GenLayer finalized this call without a successful contract execution.") as Error & { transactionHash?: string };
+    const error = new Error(
+      getReceiptFailureMessage(receipt) ?? "GenLayer finalized this call without a successful contract execution.",
+    ) as Error & { transactionHash?: string };
     error.transactionHash = hash;
     throw error;
   }
@@ -242,8 +244,12 @@ export async function writeExecutor(
   const hash = await client.writeContract({ address: executorAddress, functionName, args: [proofId], value: 0n });
   onSubmitted?.(hash);
   const receipt = await client.waitForTransactionReceipt({ hash, status: "FINALIZED", interval: FINALITY_INTERVAL_MS, retries: FINALITY_RETRIES });
-  if (receipt.txExecutionResultName === "FINISHED_WITH_ERROR" || ["DISAGREE", "TIMEOUT", "DETERMINISTIC_VIOLATION", "NO_MAJORITY", "MAJORITY_DISAGREE"].includes(receipt.resultName || "")) {
-    throw new Error("The guarded executor finalized with an execution error.");
+  if (isFailedReceipt(receipt)) {
+    const error = new Error(
+      getReceiptFailureMessage(receipt) ?? "The guarded executor finalized with an execution error.",
+    ) as Error & { transactionHash?: string };
+    error.transactionHash = hash;
+    throw error;
   }
   return { hash, receipt };
 }
