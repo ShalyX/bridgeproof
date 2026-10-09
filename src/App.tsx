@@ -69,6 +69,7 @@ type OperatorForm = {
   logsUrlTemplate: string;
   executor: string;
   finalityDepth: string;
+  active: string;
 };
 
 const initialOperatorForm = (): OperatorForm => ({
@@ -80,6 +81,7 @@ const initialOperatorForm = (): OperatorForm => ({
   logsUrlTemplate: DEFAULT_LOGS_TEMPLATE,
   executor: executorAddress,
   finalityDepth: "12",
+  active: "true",
 });
 
 type Notice = { tone: "info" | "success" | "error"; text: string } | null;
@@ -424,12 +426,46 @@ function App() {
     }
   }
 
+  async function updateTarget() {
+    setNotice(null);
+    if (!client || !account) return setNotice({ tone: "error", text: "Connect the target owner wallet before updating a target." });
+    if (!walletOnStudioNet) return setNotice({ tone: "error", text: "Switch the wallet to GenLayer StudioNet (chain ID 61999) before updating a target." });
+    if (!/^0x[0-9a-fA-F]{40}$/.test(operatorForm.executor)) return setNotice({ tone: "error", text: "Executor must be a valid deployed contract address." });
+    setBusy("update-target");
+    try {
+      const result = await client.updateTarget([
+        operatorForm.targetId.trim(), operatorForm.targetDescription.trim(),
+        operatorForm.transactionUrlTemplate.trim(), operatorForm.logsUrlTemplate.trim(),
+        operatorForm.executor.trim(), BigInt(operatorForm.finalityDepth), operatorForm.active === "true",
+      ], (hash) => setNotice({ tone: "info", text: `Target update submitted: ${hash.slice(0, 12)}…` }));
+      const nextTarget = await client.getTarget(operatorForm.targetId.trim());
+      setTarget(nextTarget);
+      setNotice({ tone: "success", text: `Target updated to version ${numberValue(nextTarget.version)} and read back after ${result.hash.slice(0, 12)}…` });
+    } catch (error) {
+      setNotice({ tone: "error", text: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function loadTarget() {
     if (!client || !operatorForm.targetId.trim()) return;
     setBusy("load-target");
     try {
       const nextTarget = await client.getTarget(operatorForm.targetId.trim());
       setTarget(nextTarget);
+      setOperatorForm((current) => ({
+        ...current,
+        targetId: nextTarget.target_id,
+        sourceChainId: nextTarget.source_chain_id,
+        targetName: nextTarget.target_name,
+        targetDescription: nextTarget.target_description,
+        transactionUrlTemplate: nextTarget.transaction_url_template,
+        logsUrlTemplate: nextTarget.logs_url_template,
+        executor: nextTarget.executor,
+        finalityDepth: String(nextTarget.finality_depth),
+        active: String(nextTarget.active),
+      }));
       setNotice({ tone: "success", text: `Loaded target ${operatorForm.targetId.trim()} from chain state.` });
     } catch (error) {
       setNotice({ tone: "error", text: error instanceof Error ? error.message : String(error) });
@@ -526,7 +562,7 @@ function App() {
       <div className="screen-heading"><button className="back-link" onClick={() => go("/")}><ArrowLeft size={15} /> Overview</button><p className="eyebrow"><span className="eyebrow-line" /> Operator control plane</p><h1>Set the boundary once.</h1><p>Register the authoritative source endpoints and the guarded executor that may consume approved permits. This is an owner-only operation and does not store private keys.</p></div>
       {deploymentBanner}
       <section className="setup-guide" aria-labelledby="setup-guide-title"><div><p className="eyebrow"><span className="eyebrow-line" /> One-time setup</p><h2 id="setup-guide-title">Register the source boundary your proofs will trust.</h2><p>Use a stable target ID for one source-chain integration. The contract stores the endpoint templates and executor binding so validators can fetch the same evidence every time.</p></div><ol><li><strong>Point to authoritative data</strong><span>Transaction and logs URLs must accept <code>{"{tx_hash}"}</code>.</span></li><li><strong>Bind the executor</strong><span>Only this deployed contract can consume an approved permit.</span></li><li><strong>Read it back</strong><span>Confirm the target is active before opening proofs.</span></li></ol></section>
-      <section className="operator-layout"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">01 / Target registry</p><h2>Source-chain target</h2></div><Settings2 size={20} className="panel-icon" /></div><p className="panel-intro">The contract stores these templates. Validators substitute the claimed transaction hash and fetch both views during assessment.</p><div className="form-grid"><label className="field"><span>Target ID</span><input value={operatorForm.targetId} onChange={(event) => patchOperator("targetId", event.target.value)} /></label><label className="field"><span>Source chain ID</span><input value={operatorForm.sourceChainId} onChange={(event) => patchOperator("sourceChainId", event.target.value)} /></label><label className="field field-wide"><span>Target name</span><input value={operatorForm.targetName} onChange={(event) => patchOperator("targetName", event.target.value)} /></label><label className="field field-wide"><span>Description</span><textarea value={operatorForm.targetDescription} onChange={(event) => patchOperator("targetDescription", event.target.value)} /></label><label className="field field-wide"><span>Transaction JSON endpoint</span><input value={operatorForm.transactionUrlTemplate} onChange={(event) => patchOperator("transactionUrlTemplate", event.target.value)} /></label><label className="field field-wide"><span>Logs JSON endpoint</span><input value={operatorForm.logsUrlTemplate} onChange={(event) => patchOperator("logsUrlTemplate", event.target.value)} /></label><label className="field field-wide"><span>Guarded executor address</span><input placeholder="0x…" value={operatorForm.executor} onChange={(event) => patchOperator("executor", event.target.value)} /></label><label className="field"><span>Finality depth</span><input inputMode="numeric" value={operatorForm.finalityDepth} onChange={(event) => patchOperator("finalityDepth", event.target.value)} /></label></div><div className="operator-actions"><button className="primary-button" onClick={registerTarget} disabled={!configured || !canWrite || isPending}>{busy === "register-target" ? <LoaderCircle className="spin" size={16} /> : <LockKeyhole size={16} />} {!account ? "Connect owner wallet" : !walletOnStudioNet ? "Switch to StudioNet to register" : "Sign and register target"}</button><button className="secondary-button" onClick={loadTarget} disabled={!configured || !client || isPending}>{busy === "load-target" ? <LoaderCircle className="spin" size={16} /> : <RefreshCw size={16} />} Read target</button></div></div><div className="panel readback-panel"><div className="panel-heading"><div><p className="eyebrow">02 / Readback</p><h2>Stored configuration</h2></div><span className="panel-number">CHAIN</span></div>{target ? <dl className="receipt-list"><div><dt>ID / version</dt><dd>{target.target_id} / {numberValue(target.version)}</dd></div><div><dt>Owner</dt><dd>{shortAddress(target.owner)}</dd></div><div><dt>Source</dt><dd>{target.source_chain_id} · {target.active ? "active" : "inactive"}</dd></div><div><dt>Executor</dt><dd>{shortAddress(target.executor)}</dd></div><div><dt>Finality</dt><dd>{numberValue(target.finality_depth)} confirmations</dd></div><div><dt>Tx template</dt><dd className="wrap-value">{target.transaction_url_template}</dd></div></dl> : <div className="empty-state compact"><div className="empty-icon"><Settings2 size={22} /></div><strong>No target read back</strong><p>Register or load a target to see the exact configuration held by BridgeProof.</p></div>}<div className="boundary-note"><ShieldCheck size={17} /><span>Only the configured executor can consume an approved permit. The browser cannot bypass this boundary.</span></div></div></section>
+      <section className="operator-layout"><div className="panel"><div className="panel-heading"><div><p className="eyebrow">01 / Target registry</p><h2>Source-chain target</h2></div><Settings2 size={20} className="panel-icon" /></div><p className="panel-intro">Register a target once, then load it before changing endpoints, executor binding, finality, or activation. Every update advances the target version and invalidates older permits.</p><div className="form-grid"><label className="field"><span>Target ID</span><input value={operatorForm.targetId} onChange={(event) => patchOperator("targetId", event.target.value)} /></label><label className="field"><span>Source chain ID</span><input value={operatorForm.sourceChainId} onChange={(event) => patchOperator("sourceChainId", event.target.value)} /></label><label className="field field-wide"><span>Target name</span><input value={operatorForm.targetName} onChange={(event) => patchOperator("targetName", event.target.value)} /></label><label className="field field-wide"><span>Description</span><textarea value={operatorForm.targetDescription} onChange={(event) => patchOperator("targetDescription", event.target.value)} /></label><label className="field field-wide"><span>Transaction JSON endpoint</span><input value={operatorForm.transactionUrlTemplate} onChange={(event) => patchOperator("transactionUrlTemplate", event.target.value)} /></label><label className="field field-wide"><span>Logs JSON endpoint</span><input value={operatorForm.logsUrlTemplate} onChange={(event) => patchOperator("logsUrlTemplate", event.target.value)} /></label><label className="field field-wide"><span>Guarded executor address</span><input placeholder="0x…" value={operatorForm.executor} onChange={(event) => patchOperator("executor", event.target.value)} /></label><label className="field"><span>Finality depth</span><input inputMode="numeric" value={operatorForm.finalityDepth} onChange={(event) => patchOperator("finalityDepth", event.target.value)} /></label><label className="field"><span>Target status</span><select value={operatorForm.active} onChange={(event) => patchOperator("active", event.target.value)}><option value="true">Active</option><option value="false">Inactive</option></select></label></div><div className="operator-actions"><button className="primary-button" onClick={registerTarget} disabled={!configured || !canWrite || isPending}>{busy === "register-target" ? <LoaderCircle className="spin" size={16} /> : <LockKeyhole size={16} />} {!account ? "Connect owner wallet" : !walletOnStudioNet ? "Switch to StudioNet to register" : "Sign and register target"}</button><button className="secondary-button" onClick={loadTarget} disabled={!configured || !client || isPending}>{busy === "load-target" ? <LoaderCircle className="spin" size={16} /> : <RefreshCw size={16} />} Read target</button><button className="secondary-button" onClick={updateTarget} disabled={!configured || !canWrite || isPending || !target}>{busy === "update-target" ? <LoaderCircle className="spin" size={16} /> : <ShieldCheck size={16} />} Sign and update target</button></div></div><div className="panel readback-panel"><div className="panel-heading"><div><p className="eyebrow">02 / Readback</p><h2>Stored configuration</h2></div><span className="panel-number">CHAIN</span></div>{target ? <dl className="receipt-list"><div><dt>ID / version</dt><dd>{target.target_id} / {numberValue(target.version)}</dd></div><div><dt>Owner</dt><dd>{shortAddress(target.owner)}</dd></div><div><dt>Source</dt><dd>{target.source_chain_id} · {target.active ? "active" : "inactive"}</dd></div><div><dt>Executor</dt><dd>{shortAddress(target.executor)}</dd></div><div><dt>Finality</dt><dd>{numberValue(target.finality_depth)} confirmations</dd></div><div><dt>Tx template</dt><dd className="wrap-value">{target.transaction_url_template}</dd></div></dl> : <div className="empty-state compact"><div className="empty-icon"><Settings2 size={22} /></div><strong>No target read back</strong><p>Register or load a target to see the exact configuration held by BridgeProof.</p></div>}<div className="boundary-note"><ShieldCheck size={17} /><span>Only the configured executor can consume an approved permit. The browser cannot bypass this boundary.</span></div></div></section>
     </>;
   }
 
