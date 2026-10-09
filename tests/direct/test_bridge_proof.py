@@ -274,6 +274,108 @@ def test_target_update_invalidates_old_proof(
     assert proof["permit_nonce"] == 0
 
 
+def test_approved_source_transaction_cannot_authorize_another_proof(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    contract = deploy(direct_deploy)
+    register_default_target(contract, direct_vm, direct_alice)
+    open_default_proof(contract, direct_vm, direct_bob)
+    mock_sources(direct_vm)
+    mock_review(direct_vm)
+
+    direct_vm.sender = direct_alice
+    contract.assess_proof("proof-1")
+
+    assert contract.get_source_authorization(SOURCE_CHAIN, TX_HASH) == "proof-1"
+
+    direct_vm.sender = direct_bob
+    with direct_vm.expect_revert("Source transaction already authorized"):
+        open_default_proof(
+            contract,
+            direct_vm,
+            direct_bob,
+            proof_id="proof-duplicate-source",
+        )
+
+
+def test_two_pending_proofs_for_same_source_cannot_both_receive_permits(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    contract = deploy(direct_deploy)
+    register_default_target(contract, direct_vm, direct_alice)
+    open_default_proof(contract, direct_vm, direct_bob, proof_id="proof-first")
+    open_default_proof(contract, direct_vm, direct_bob, proof_id="proof-second")
+    mock_sources(direct_vm)
+    mock_review(direct_vm)
+
+    direct_vm.sender = direct_alice
+    contract.assess_proof("proof-first")
+    contract.assess_proof("proof-second")
+
+    first = contract.get_proof("proof-first")
+    second = contract.get_proof("proof-second")
+    assert first["status"] == "approved"
+    assert first["permit_nonce"] == 1
+    assert second["status"] == "rejected"
+    assert second["reason_code"] == "SOURCE_TRANSACTION_REPLAY"
+    assert second["permit_nonce"] == 0
+    assert contract.get_source_authorization(SOURCE_CHAIN, TX_HASH) == "proof-first"
+
+
+def test_deactivated_target_invalidates_an_approved_permit(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    contract = deploy(direct_deploy)
+    register_default_target(contract, direct_vm, direct_alice)
+    open_default_proof(contract, direct_vm, direct_bob)
+    mock_sources(direct_vm)
+    mock_review(direct_vm)
+    direct_vm.sender = direct_alice
+    contract.assess_proof("proof-1")
+
+    contract.update_target(
+        "sepolia-transfer",
+        "Deactivated source target",
+        TARGET_TX_URL,
+        TARGET_LOGS_URL,
+        EXECUTOR,
+        12,
+        False,
+    )
+
+    assert contract.is_permit_valid("proof-1") is False
+    direct_vm.sender = bytes.fromhex(EXECUTOR[2:])
+    with direct_vm.expect_revert("Target is inactive"):
+        contract.consume_permit("proof-1")
+
+
+def test_target_version_change_invalidates_an_approved_permit(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    contract = deploy(direct_deploy)
+    register_default_target(contract, direct_vm, direct_alice)
+    open_default_proof(contract, direct_vm, direct_bob)
+    mock_sources(direct_vm)
+    mock_review(direct_vm)
+    direct_vm.sender = direct_alice
+    contract.assess_proof("proof-1")
+
+    contract.update_target(
+        "sepolia-transfer",
+        "Updated source target",
+        TARGET_TX_URL,
+        TARGET_LOGS_URL,
+        EXECUTOR,
+        12,
+        True,
+    )
+
+    assert contract.is_permit_valid("proof-1") is False
+    direct_vm.sender = bytes.fromhex(EXECUTOR[2:])
+    with direct_vm.expect_revert("Target version has changed"):
+        contract.consume_permit("proof-1")
+
+
 def test_only_owner_can_update_and_wrong_executor_cannot_consume(
     direct_vm, direct_deploy, direct_alice, direct_bob
 ):

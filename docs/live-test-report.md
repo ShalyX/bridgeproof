@@ -1,6 +1,31 @@
 # BridgeProof live test report
 
-Updated: 2026-10-07
+Updated: 2026-10-09
+
+## Security correction status
+
+The October 7 deployment below is retained as historical evidence for the
+original end-to-end flow. It does **not** contain the October 9 hardening and
+must not be treated as evidence for the corrected replay and target-mutation
+invariants.
+
+The corrected contracts now:
+
+- reserve `(source_chain_id, tx_hash)` when the first proof is approved;
+- reject a later proof for the same source transaction with
+  `SOURCE_TRANSACTION_REPLAY`, including when both proofs were opened before
+  either assessment;
+- make `is_permit_valid` fail when the target is inactive or its version no
+  longer matches the approved proof;
+- enforce target activation and version again at permit consumption, executor
+  start, and executor finalization; and
+- explicitly scope v1 to transaction-receipt verification rather than
+  protocol-specific bridge-event verification.
+
+The local direct-contract suite covers these adversarial cases and currently
+passes 18 tests. A fresh StudioNet deployment and live wallet-backed replay,
+deactivation, and version-mutation runs are required before this section can be
+marked live-verified.
 
 This report records the first real StudioNet-to-Sepolia execution path. It uses the
 unlocked RepLayer account for signing and a live Blockscout Sepolia receipt as the

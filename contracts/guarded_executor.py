@@ -15,6 +15,7 @@ MAX_ID_LENGTH = 100
 class Execution:
     proof_id: str
     target_id: str
+    target_version: u256
     status: str
     started_at: u256
     finalized_at: u256
@@ -58,6 +59,7 @@ class GuardedExecutor(gl.Contract):
         return {
             "proof_id": execution.proof_id,
             "target_id": execution.target_id,
+            "target_version": execution.target_version,
             "status": execution.status,
             "started_at": execution.started_at,
             "finalized_at": execution.finalized_at,
@@ -75,6 +77,10 @@ class GuardedExecutor(gl.Contract):
         target = guard.view().get_target(proof["target_id"])
         if proof["status"] != "approved" or proof["consumed"]:
             raise gl.vm.UserError(f"{ERROR_EXPECTED} No valid BridgeProof permit")
+        if not target["active"]:
+            raise gl.vm.UserError(f"{ERROR_EXPECTED} Target is inactive")
+        if proof["target_version"] != target["version"]:
+            raise gl.vm.UserError(f"{ERROR_EXPECTED} Target version has changed")
         if self._address_text(target["executor"]) != self._address_text(
             gl.message.contract_address
         ):
@@ -85,6 +91,7 @@ class GuardedExecutor(gl.Contract):
         self.executions[proof_id] = Execution(
             proof_id=proof_id,
             target_id=proof["target_id"],
+            target_version=proof["target_version"],
             status="awaiting_permit",
             started_at=self._now(),
             finalized_at=0,
@@ -99,6 +106,17 @@ class GuardedExecutor(gl.Contract):
             raise gl.vm.UserError(f"{ERROR_EXPECTED} Execution is not pending")
 
         proof = self._guard().view().get_proof(proof_id)
+        target = self._guard().view().get_target(execution.target_id)
+        if not target["active"]:
+            raise gl.vm.UserError(f"{ERROR_EXPECTED} Target is inactive")
+        if execution.target_version != target["version"]:
+            raise gl.vm.UserError(f"{ERROR_EXPECTED} Target version has changed")
+        if proof["target_version"] != target["version"]:
+            raise gl.vm.UserError(f"{ERROR_EXPECTED} Target version has changed")
+        if self._address_text(target["executor"]) != self._address_text(
+            gl.message.contract_address
+        ):
+            raise gl.vm.UserError(f"{ERROR_EXPECTED} Executor is not registered")
         if proof["status"] != "permit_consumed" or not proof["consumed"]:
             raise gl.vm.UserError(f"{ERROR_EXPECTED} Permit has not been consumed")
 

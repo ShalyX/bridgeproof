@@ -40,6 +40,7 @@ VALID_REASON_CODES = (
     "SOURCE_FAILURE",
     "SOURCE_DISAGREEMENT",
     "MALFORMED_SOURCE",
+    "SOURCE_TRANSACTION_REPLAY",
 )
 
 
@@ -115,6 +116,7 @@ class BridgeProof(gl.Contract):
     target_order: DynArray[str]
     proofs: TreeMap[str, Proof]
     proof_order: DynArray[str]
+    source_authorizations: TreeMap[str, str]
     next_permit_nonce: u256
 
     def __init__(self):
@@ -190,6 +192,9 @@ class BridgeProof(gl.Contract):
         if proof_id not in self.proofs:
             raise gl.vm.UserError(f"{ERROR_EXPECTED} Proof not found")
         return self.proofs[proof_id]
+
+    def _source_key(self, source_chain_id: str, tx_hash: str) -> str:
+        return f"{str(source_chain_id).strip()}:{str(tx_hash).strip().lower()}"
 
     def _require_owner(self, target: Target) -> None:
         if self._sender_hex() != target.owner.as_hex.lower():
@@ -705,13 +710,19 @@ consistent enough for the deterministic field checks to pass. Return JSON only:
         normalized_recipient = self._require_address(
             expected_recipient, "expected_recipient"
         )
+        normalized_tx_hash = self._require_tx_hash(tx_hash)
+        source_key = self._source_key(normalized_source_chain_id, normalized_tx_hash)
+        if source_key in self.source_authorizations:
+            raise gl.vm.UserError(
+                f"{ERROR_EXPECTED} Source transaction already authorized"
+            )
         proof = Proof(
             proof_id=proof_id,
             target_id=target_id,
             target_version=target.version,
             reporter=gl.message.sender_address,
             source_chain_id=normalized_source_chain_id,
-            tx_hash=self._require_tx_hash(tx_hash),
+            tx_hash=normalized_tx_hash,
             expected_sender=normalized_sender,
             expected_recipient=normalized_recipient,
             expected_value=expected_value,
@@ -753,6 +764,17 @@ consistent enough for the deterministic field checks to pass. Return JSON only:
             proof.reason_code = "SOURCE_DISAGREEMENT"
             proof.decided_at = self._now()
             return
+        source_key = self._source_key(proof.source_chain_id, proof.tx_hash)
+        if (
+            source_key in self.source_authorizations
+            and self.source_authorizations[source_key] != proof.proof_id
+        ):
+            proof.status = "rejected"
+            proof.outcome = "rejected"
+            proof.reason_code = "SOURCE_TRANSACTION_REPLAY"
+            proof.rationale = "This source transaction already authorized another proof."
+            proof.decided_at = self._now()
+            return
 
         result = self._evaluate_with_consensus(target, proof)
         reason = self._deterministic_reason(target, proof, result)
@@ -788,6 +810,7 @@ consistent enough for the deterministic field checks to pass. Return JSON only:
         proof.outcome = "approved"
         proof.permit_nonce = self.next_permit_nonce
         self.next_permit_nonce += 1
+        self.source_authorizations[source_key] = proof.proof_id
 
     @gl.public.write
     def consume_permit(self, proof_id: str) -> None:
@@ -795,6 +818,10 @@ consistent enough for the deterministic field checks to pass. Return JSON only:
         target = self._get_target(proof.target_id)
         if self._sender_hex() != target.executor:
             raise gl.vm.UserError(f"{ERROR_EXPECTED} Caller is not the executor")
+        if not target.active:
+            raise gl.vm.UserError(f"{ERROR_EXPECTED} Target is inactive")
+        if proof.target_version != target.version:
+            raise gl.vm.UserError(f"{ERROR_EXPECTED} Target version has changed")
         if proof.status != "approved" or proof.consumed or proof.permit_nonce == 0:
             raise gl.vm.UserError(f"{ERROR_EXPECTED} Proof has no active permit")
         if proof.valid_until <= self._now():
@@ -831,11 +858,28 @@ consistent enough for the deterministic field checks to pass. Return JSON only:
         return {str(index): self.proof_order[index] for index in range(len(self.proof_order))}
 
     @gl.public.view
+    def get_source_authorization(self, source_chain_id: str, tx_hash: str) -> str:
+        normalized_tx_hash = self._require_tx_hash(tx_hash)
+        source_key = self._source_key(source_chain_id, normalized_tx_hash)
+        if source_key not in self.source_authorizations:
+            return ""
+        return self.source_authorizations[source_key]
+
+    @gl.public.view
     def is_permit_valid(self, proof_id: str) -> bool:
         proof = self._get_proof(proof_id)
+        target = self._get_target(proof.target_id)
         return (
             proof.status == "approved"
             and not proof.consumed
             and proof.permit_nonce != 0
             and proof.valid_until > self._now()
+            and target.active
+            and proof.target_version == target.version
+            and self._source_key(proof.source_chain_id, proof.tx_hash)
+            in self.source_authorizations
+            and self.source_authorizations[
+                self._source_key(proof.source_chain_id, proof.tx_hash)
+            ]
+            == proof.proof_id
         )
