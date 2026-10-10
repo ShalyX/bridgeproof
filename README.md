@@ -24,9 +24,9 @@ When creating a proof, the operator pastes the source transaction hash. BridgePr
 
 ## Current status
 
-The original positive lifecycle, adversarial rejection path, and Rabby refresh/reconnect behavior were proven on StudioNet against a live Sepolia receipt. The hardened contract additionally reserves each `(source_chain_id, tx_hash)` after its first approval, rechecks target activation and version at permit consumption, and makes the guarded executor repeat those checks at execution start and finalization. The corrected contracts require a fresh StudioNet deployment before the new lifecycle can be represented as live evidence.
+The positive lifecycle, adversarial rejection path, Rabby refresh/reconnect behavior, source-level replay protection, and target lifecycle invalidation are proven on StudioNet against live Sepolia receipts. The hardened contract reserves each `(source_chain_id, tx_hash)` after its first approval, rechecks target activation and version at permit consumption, and makes the guarded executor repeat those checks at execution start and finalization.
 
-- [Open BridgeProof](https://bridgeproof-shalyxs-projects.vercel.app/)
+- [Open BridgeProof](https://bridgeproof.vercel.app/)
 - [View the original public proof](https://bridgeproof-shalyxs-projects.vercel.app/proofs/proof-muycwo6h)
 
 See the [live test report](docs/live-test-report.md), [product specification](docs/product-spec.md), and [contract boundary](docs/contract-boundary.md) for the public implementation notes.

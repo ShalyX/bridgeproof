@@ -28,8 +28,15 @@ class GuardedExecutor(gl.Contract):
     executions: TreeMap[str, Execution]
     execution_order: DynArray[str]
 
-    def __init__(self, bridge_proof: Address):
-        self.bridge_proof = self._address_text(bridge_proof)
+    def __init__(self, bridge_proof: str):
+        normalized = self._address_text(bridge_proof)
+        if len(normalized) != 42 or not normalized.startswith("0x"):
+            raise gl.vm.UserError(f"{ERROR_EXPECTED} invalid bridge_proof address")
+        try:
+            int(normalized[2:], 16)
+        except ValueError:
+            raise gl.vm.UserError(f"{ERROR_EXPECTED} invalid bridge_proof address")
+        self.bridge_proof = normalized
 
     def _now(self) -> int:
         return int(datetime.now(timezone.utc).timestamp())
@@ -45,10 +52,7 @@ class GuardedExecutor(gl.Contract):
         return text
 
     def _guard(self):
-        bridge_proof = self.bridge_proof.strip()
-        if bridge_proof.lower().startswith("addr#"):
-            bridge_proof = bridge_proof[5:]
-        return gl.get_contract_at(Address(bridge_proof))
+        return gl.get_contract_at(Address(self.bridge_proof))
 
     def _get_execution(self, proof_id: str) -> Execution:
         if proof_id not in self.executions:

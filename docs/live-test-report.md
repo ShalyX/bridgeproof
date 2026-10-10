@@ -22,16 +22,16 @@ The corrected contracts now:
 - explicitly scope v1 to transaction-receipt verification rather than
   protocol-specific bridge-event verification.
 
-The direct-contract suite covers these adversarial cases and passes 18 tests.
-The corrected contracts and the source-level replay boundary are now verified
-on StudioNet. Live target deactivation and version-mutation runs remain.
+The direct-contract suite covers these adversarial cases and passes 19 tests.
+The corrected contracts, source-level replay boundary, target deactivation,
+and target-version invalidation are verified on StudioNet.
 
 ## Corrected StudioNet deployment
 
 - BridgeProof: `0xd44F249529105B1D623b59974B88ee5D31fFB5E5`
 - BridgeProof deployment: `0xae3082e03f4c246f30d051d8526a9bed1ac744b5a6bb6f2d8b98dc9c08800fcd`
-- GuardedExecutor: `0x2B1C0DE9Ee4DAe9C8241410CE860c0E74c52818B`
-- GuardedExecutor deployment: `0x5ce9620955aaf0e0892f86aee7a8a8b8ad8ffe0eb33f232c0032823dca330e50`
+- GuardedExecutor: `0xCb3AF5ba18e2a072993604dC1e64eF5F7cC8af5F`
+- GuardedExecutor deployment: `0x0a7a98002f0cfea4d276adeb3a4b281361b806d83a11eef5ba64aca08d6a9da5`
 - Registered target: `sepolia-receipt-v2`, active, version `1`
 - Target registration: `0x1a44008093ab8b9fb0fb3e417b25c12ef9d600c7f6102e17ef6fff91ddced0d9`
 - Public app: `https://bridgeproof.vercel.app`
@@ -59,6 +59,31 @@ receipt parser now requires an explicit successful execution result, handles
 StudioNet's snake-case receipt fields, surfaces the rollback message, and fails
 closed when execution status is absent. Sixteen frontend tests cover both the
 success and rollback receipt shapes.
+
+### Corrected target lifecycle runs
+
+A separate target and approved proof were created so target mutation could be
+tested without consuming the permit:
+
+- Target: `sepolia-receipt-lifecycle-v1`
+- Approved proof: `lifecycle-v1-20261010`, target version `1`
+- Source transaction: `0xa4e2526ed51ad14d633dd30024a9bc661ce2a6656061645561394299bebaabfe`
+- Assessment: `0x2a3e033bbfc7dad59cd790fd9a9f00df468e990f711682932de4d3fa5502aec9`
+- Corrected executor deployment: `0x0a7a98002f0cfea4d276adeb3a4b281361b806d83a11eef5ba64aca08d6a9da5`
+- Inactive executor binding: `0x59a8ffa2cc7bcda967a53e822b2d8eb9fc8bbced0544bc59ccd471ddb920c9ce`
+- Inactive execution attempt: `0x55c736a4481fdb52c0a4cec7b85808678f2428e31e9a12b480e829dc42364be5`
+- Inactive result: finalized rollback `[EXPECTED] Target is inactive`.
+- Reactivation/version update: `0x7f4b17a088d2dba05e75586d1e4f7f91b64d2dfb5043618314e9bc259cdb0f19`
+- Stale-version execution attempt: `0x3fb8562357b5e70f181fbdb54d6fd7e878f5c91bb1ca4759c014417bafbc4fc8`
+- Stale-version result: finalized rollback `[EXPECTED] Target version has changed`.
+- Final target readback: active, version `4`, executor
+  `0xCb3AF5ba18e2a072993604dC1e64eF5F7cC8af5F`.
+- Final permit readback for the version-1 proof: `false`.
+
+The first corrected executor deployment exposed a Studio constructor-encoding
+issue when an `Address` argument was persisted as an `addr#...` marker. The
+deployed replacement accepts a validated `0x` string, stores its canonical
+lowercase form, and successfully reaches the target activation/version checks.
 
 This report records the first real StudioNet-to-Sepolia execution path. It uses the
 unlocked RepLayer account for signing and a live Blockscout Sepolia receipt as the

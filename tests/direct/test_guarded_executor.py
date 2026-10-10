@@ -56,6 +56,11 @@ def deploy_executor(direct_deploy):
     )
 
 
+def test_guarded_executor_rejects_malformed_guard_address(direct_deploy, direct_vm):
+    with direct_vm.expect_revert("invalid bridge_proof address"):
+        direct_deploy(EXECUTOR_CONTRACT, "not-an-address", sdk_version="v0.2.16")
+
+
 def test_guarded_executor_requires_and_finalizes_consumed_permit(
     direct_deploy, monkeypatch
 ):
